@@ -1,18 +1,20 @@
-import pytest
+from starlette.testclient import TestClient
+
+import pytest_asyncio
 import asyncpg
 from app.main import app
-from fastapi.testclient import TestClient
+from httpx import AsyncClient, ASGITransport
 
 # URL базы данных
 DATABASE_URL = "postgresql+asyncpg://user:password@db/applications"
 
 
-@pytest.fixture(scope="function", autouse=True)
+@pytest_asyncio.fixture(scope="function", autouse=True)
 async def setup_test_database():
     """
     Очищает базу данных перед каждым тестом, чтобы избежать конфликтов.
     """
-    conn = await asyncpg.connect(dsn=DATABASE_URL.replace("+asyncpg", ""))
+    conn = await asyncpg.connect(dsn=DATABASE_URL) #.replace("+asyncpg", ""))
     try:
         # Получаем список всех таблиц
         tables = await conn.fetch(
@@ -29,10 +31,10 @@ async def setup_test_database():
         await conn.close()
 
 
-@pytest.fixture(scope="function")
-def test_client():
+@pytest_asyncio.fixture(scope="function")
+async def test_client():
     """
-    Создает клиент для тестирования.
+    Создает асинхронный клиент для тестирования.
     """
-    with TestClient(app) as client:
+    async with AsyncClient(transport=ASGITransport(app), base_url="http://test") as client:
         yield client

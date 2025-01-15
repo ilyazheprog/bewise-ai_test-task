@@ -13,6 +13,9 @@ services:
       - ./alembic:/app/alembic  # Подключаем папку alembic
       - ./alembic.ini:/app/alembic.ini  # Подключаем alembic.ini
       - ./app:/app/app  # Код приложения
+
+    networks:
+      - kafka-network
   db:
     image: postgres:15
     environment:
@@ -21,21 +24,61 @@ services:
       POSTGRES_DB: applications
     ports:
       - "5432:5432"
+    
+    networks:
+      - kafka-network
     volumes:
       - db_data:/var/lib/postgresql/data
 
-  test:
-    build:
-      context: .
-      dockerfile: Dockerfile.test
-    depends_on:
-      - db
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper
     environment:
-      DATABASE_URL: postgresql+asyncpg://user:password@db/applications
-    volumes:
-      - .:/app
-    command: >
-      sh -c "pytest tests"
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - '2181:2181'
+    networks:
+      - kafka-network
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    networks:
+      - kafka-network
+    ports:
+      - '9092:9092'
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_MAX_POLL_RECORDS: 500
+      KAFKA_MAX_POLL_INTERVAL_MS: 300000
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+  # test:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.test
+  #   depends_on:
+  #     - db
+  #   environment:
+  #     DATABASE_URL: postgresql+asyncpg://user:password@db/applications
+  #   volumes:
+  #     - .:/app
+  #   command: >
+  #     sh -c "pytest tests"
 
 volumes:
   db_data:
+
+
+
+networks:
+  kafka-network:
+    driver: bridge
