@@ -10,91 +10,72 @@ from app.db.methods import (
     update_application,
     delete_application,
 )
+from app.core.schemas import ApplicationCreate, ApplicationUpdate, ApplicationResponse
 
 router = APIRouter(tags=["Applications"])
 
-
-@router.post("/applications", response_model=dict)
+@router.post("/applications", response_model=ApplicationResponse)
 async def create_new_application(
-    user_name: str, description: str, db: AsyncSession = Depends(get_db)
-) -> dict:
+    application: ApplicationCreate, db: AsyncSession = Depends(get_db)
+) -> ApplicationResponse:
     """
     Эндпоинт для создания новой заявки.
     """
-    application = await create_application(db, user_name=user_name, description=description)
-    if not application:
+    new_application = await create_application(
+        db, user_name=application.user_name, description=application.description
+    )
+    if not new_application:
         raise HTTPException(status_code=500, detail="Ошибка создания заявки.")
-    return {
-        "id": application.id,
-        "user_name": application.user_name,
-        "description": application.description,
-        "created_at": application.created_at,
-    }
+    return new_application  # Здесь возвращаем правильный объект
 
 
-@router.get("/applications", response_model=List[dict])
+@router.get("/applications", response_model=List[ApplicationResponse])
 async def get_all_applications(
     user_name: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     size: int = Query(10, ge=1),
     db: AsyncSession = Depends(get_db),
-) -> List[dict]:
+) -> List[ApplicationResponse]:
     """
     Эндпоинт для получения списка заявок с фильтрацией и пагинацией.
     """
     applications = await get_applications(db, user_name=user_name, page=page, size=size)
-    return [
-        {
-            "id": app.id,
-            "user_name": app.user_name,
-            "description": app.description,
-            "created_at": app.created_at,
-        }
-        for app in applications
-    ]
+    return applications  # Убедитесь, что возвращаем список объектов
 
-
-@router.get("/applications/{application_id}", response_model=dict)
-async def get_application(application_id: int, db: AsyncSession = Depends(get_db)) -> dict:
+@router.get("/applications/{application_id}", response_model=ApplicationResponse)
+async def get_application(
+    application_id: int, db: AsyncSession = Depends(get_db)
+) -> ApplicationResponse:
     """
     Эндпоинт для получения заявки по ID.
     """
     application = await get_application_by_id(db, application_id=application_id)
     if not application:
         raise HTTPException(status_code=404, detail="Заявка не найдена.")
-    return {
-        "id": application.id,
-        "user_name": application.user_name,
-        "description": application.description,
-        "created_at": application.created_at,
-    }
+    return application
 
 
-@router.put("/applications/{application_id}", response_model=dict)
+@router.put("/applications/{application_id}", response_model=ApplicationResponse)
 async def update_existing_application(
     application_id: int,
-    user_name: Optional[str] = None,
-    description: Optional[str] = None,
+    application_update: ApplicationUpdate,
     db: AsyncSession = Depends(get_db),
-) -> dict:
+) -> ApplicationResponse:
     """
     Эндпоинт для обновления существующей заявки.
     """
     application = await update_application(
-        db, application_id=application_id, user_name=user_name, description=description
+        db, application_id=application_id, **application_update.dict(exclude_unset=True)
     )
     if not application:
         raise HTTPException(status_code=404, detail="Заявка не найдена.")
-    return {
-        "id": application.id,
-        "user_name": application.user_name,
-        "description": application.description,
-        "created_at": application.created_at,
-    }
+    return application
 
 
 @router.delete("/applications/{application_id}", response_model=dict)
-async def delete_existing_application(application_id: int, db: AsyncSession = Depends(get_db)) -> dict:
+async def delete_existing_application(
+    application_id: int, db: AsyncSession = Depends(get_db)
+) -> dict:
     """
     Эндпоинт для удаления заявки по ID.
     """

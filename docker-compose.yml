@@ -24,5 +24,18 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
 
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql+asyncpg://user:password@db/applications
+    volumes:
+      - .:/app
+    command: >
+      sh -c "pytest tests"
+
 volumes:
   db_data:
